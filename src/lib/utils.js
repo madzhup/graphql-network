@@ -90,12 +90,21 @@ export function isGraphQL(entry) {
 
 export function parseEntry(entry) {
   let data;
+  let queryVariables;
+
   if (isContentType(entry, 'application/graphql')) {
     data = entry.request.postData.text;
+    queryVariables = entry.request.postData.variables;
   } else if (isContentType(entry, 'application/x-www-form-urlencoded')) {
     data = getQueryFromParams(entry.request.postData.params);
   } else {
-    data = JSON.parse(entry.request.postData.text).query;
+    try {
+      const { query, variables } = JSON.parse(entry.request.postData.text);
+      data = query;
+      queryVariables = typeof variables === 'string' ? JSON.parse(variables) : variables;
+    } catch (e) {
+      return Promise.resolve(`Internal Error Parsing: ${entry}. Message: ${e.message}. Stack: ${e.stack}`);
+    }
   }
 
   const query = data;
@@ -121,6 +130,7 @@ export function parseEntry(entry) {
     entry.getContent(responseBody => {
       resolve({
         responseBody,
+        queryVariables,
         fragments,
         id: `${Date.now() + Math.random()}`,
         url: entry.request.url,
